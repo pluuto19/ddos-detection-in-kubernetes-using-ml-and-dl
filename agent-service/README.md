@@ -1,6 +1,6 @@
 `controller/controller.go` combines the data and sends it off to ___
 
-`falco-scraper/webserver.go` defines a single endpoint server to receive syscall metrics.
+`falco-scraper/webserver.go` defines a single endpoint server to receive syscall metrics from Falco.
 
 `falco-scraper/aggregator` defines a hashmap that aggregates the count of syscalls until a predefined time interval and sends it off to `controller`
 
