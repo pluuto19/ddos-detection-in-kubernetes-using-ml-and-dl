@@ -1,0 +1,8 @@
+- rule: Testing syscalls
+  desc: >
+    Checking HTTP connection and file output of syscalls.
+  condition: >
+    syscall.type in (mmap, munmap, accept, brk, bind, connect, chdir, clone, close, kill, listen, mkdir, open, poll, read, rename, recvfrom, select, socket, sendto, write)
+  output: >
+    event occ (event=%syscall.type)
+  priority: CRITICAL
