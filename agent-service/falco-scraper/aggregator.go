@@ -1,9 +1,5 @@
 package falco_scraper
 
-import (
-	"fmt"
-)
-
 var aggregatedCalls map[string]int
 
 func updateHashMap(reqBody string) {
@@ -15,7 +11,6 @@ func updateHashMap(reqBody string) {
 		aggregatedCalls[reqBody]++
 	}
 
-	fmt.Println(aggregatedCalls)
 }
 
 func GetHashmap() *map[string]int {
