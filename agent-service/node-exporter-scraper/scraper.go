@@ -1,7 +1,6 @@
 package node_exporter_scraper
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -16,7 +15,5 @@ func GetMetrics() {
 		return
 	}
 
-	nodeMetricsString := string(nodeMetricsByte)
-
-	fmt.Println(nodeMetricsString)
+	cleanResponseBody(string(nodeMetricsByte))
 }

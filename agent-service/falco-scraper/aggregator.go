@@ -13,10 +13,10 @@ func updateHashMap(reqBody string) {
 
 }
 
-func GetHashmap() *map[string]int {
+func GetSyscalls() *map[string]int {
 	return &aggregatedCalls
 }
 
-func ResetHashmap() {
+func ResetSyscalls() {
 	aggregatedCalls = make(map[string]int)
 }
