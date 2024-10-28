@@ -1,7 +1,8 @@
 package main
 
-import "agent-service/falco-scraper"
+import "agent-service/node-exporter-scraper"
 
 func main() {
-	falco_scraper.RegisterEndpoint()
+	// falco_scraper.RegisterEndpoint()
+	node_exporter_scraper.GetMetrics()
 }
