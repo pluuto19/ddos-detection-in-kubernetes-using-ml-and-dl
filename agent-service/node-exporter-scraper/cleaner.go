@@ -109,7 +109,7 @@ func GetResourceMetrics() map[string]float64 {
 	return resourceMetricsName
 }
 
-func resetResourceMetrics() {
+func ResetResourceMetrics() {
 	resourceMetricsName = make(map[string]float64)
 }
 
