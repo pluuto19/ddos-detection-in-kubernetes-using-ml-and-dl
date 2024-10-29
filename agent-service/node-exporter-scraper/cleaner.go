@@ -2,7 +2,7 @@ package node_exporter_scraper
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -22,7 +22,6 @@ func cleanResponseBody(metricsStr string) {
 	for _, noDeviceMetric := range noDeviceBasedResourceMetrics {
 		metricValue, err := findMetricValueNoDevice(metricsStr, noDeviceMetric)
 		if err != nil {
-			fmt.Printf("Error processing metric %s: %v\n", noDeviceMetric, err)
 			continue
 		}
 		resourceMetricsName[noDeviceMetric] = metricValue
@@ -31,13 +30,10 @@ func cleanResponseBody(metricsStr string) {
 	for _, deviceMetric := range deviceBasedResourceMetrics {
 		metricValue, err := findMetricValueDevice(metricsStr, deviceMetric)
 		if err != nil {
-			fmt.Printf("Error processing metric %s: %v\n", deviceMetric, err)
 			continue
 		}
 		resourceMetricsName[deviceMetric] = metricValue
 	}
-
-	fmt.Println(resourceMetricsName)
 }
 
 func findMetricValueNoDevice(metricsStr, metric string) (float64, error) {
@@ -54,7 +50,7 @@ func findMetricValueNoDevice(metricsStr, metric string) (float64, error) {
 			}
 		}
 	}
-	return 0, fmt.Errorf("metric %s not found", metric)
+	return 0, errors.New("metric not found")
 }
 
 func findMetricValueDevice(metricsStr, metric string) (float64, error) {
@@ -105,14 +101,15 @@ func findMetricValueDevice(metricsStr, metric string) (float64, error) {
 	return total, nil
 }
 
-func GetResourceMetrics() map[string]float64 {
-	return resourceMetricsName
+func GetResourceMetrics() *map[string]float64 {
+	return &resourceMetricsName
 }
 
 func ResetResourceMetrics() {
 	resourceMetricsName = make(map[string]float64)
 }
 
-/* IMPROVEMENT
+/*
+IMPROVEMENT
 Create a function to eliminate repeated code
 */

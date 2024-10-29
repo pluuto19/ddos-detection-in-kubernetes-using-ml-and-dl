@@ -1,14 +1,15 @@
 package controller
 
 import (
-	falco_scraper "agent-service/falco-scraper"
-	node_exporter_scraper "agent-service/node-exporter-scraper"
+	falcoscraper "agent-service/falco-scraper"
+	nodeexporterscraper "agent-service/node-exporter-scraper"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const TIME_INTERVAL = int64(2)
+const TIME_INTERVAL = int64(4)
 
 func FetchAndCombine() {
 	for {
@@ -16,16 +17,29 @@ func FetchAndCombine() {
 		t.Format(time.RFC3339)
 		tStr := t.String()
 		secStr := strings.Split(strings.Split(strings.Split(tStr, " ")[1], ":")[2], ".")[0]
-		i, err := strconv.ParseInt(secStr, 10, 32)
+		i, err := strconv.ParseInt(secStr, 10, 64)
 		if err != nil {
 			return
 		}
 		if i%TIME_INTERVAL == 0 {
-			syscalls := falco_scraper.GetSyscalls()
-			falco_scraper.ResetSyscalls()
-			resourceMetrics := node_exporter_scraper.GetResourceMetrics()
-			node_exporter_scraper.ResetResourceMetrics()
-			// combine and send off
+			for {
+				/*
+					Sleep here for x seconds as we have reached a time interval where
+					sleeping for x seconds will always wake it up at the next correct
+					time of scraping.
+				*/
+				time.Sleep(time.Second * time.Duration(TIME_INTERVAL))
+				syscalls := falcoscraper.GetSyscalls()
+				nodeexporterscraper.GetMetrics()
+				resourceMetrics := nodeexporterscraper.GetResourceMetrics()
+
+				// combine and send off
+				fmt.Println(*syscalls, "\n", *resourceMetrics)
+				fmt.Println()
+
+				falcoscraper.ResetSyscalls()
+				nodeexporterscraper.ResetResourceMetrics()
+			}
 		}
 	}
 }
