@@ -10,7 +10,7 @@ import (
 
 const TIME_INTERVAL = int64(2)
 
-func fetchAndCombine() {
+func FetchAndCombine() {
 	for {
 		t := time.Now()
 		t.Format(time.RFC3339)
