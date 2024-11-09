@@ -6,7 +6,8 @@ import time
 import threading
 from datetime import datetime
 
-PORT = 7745
+PORT_CMD = 7745
+PORT_DATA = 7746
 MODES = ["normal_traffic", "high_traffic", "udp_flood", "tcp_flood", "http_flood", "icmp_flood"]
 CSV_FILE = "collected_data.csv"
 EXP_CONNS = 2
@@ -33,13 +34,42 @@ def save_to_csv(data):
         writer = csv.DictWriter(csv_file, fieldnames=HEADERS)
         writer.writerow(data)
 
-def handle_client_connection(client_socket):
-    global current_mode
+def notify_clients(new_mode):
     with client_lock:
-        clients.append(client_socket)
+        for client in clients:
+            try:
+                client.sendall(new_mode.encode())
+            except BrokenPipeError:
+                clients.remove(client)
+
+def mode_switcher():
+    global current_mode
+    while True:
+        with mode_lock:
+            new_mode = random.choice(MODES)
+            current_mode = new_mode
+            notify_clients(new_mode)
+        time.sleep(random.randint(5, 15))
+
+def start_command_server():
+    bot_count = 0
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(("", PORT_CMD))
+    server_socket.listen(5)
+    while True:
+        client_socket, client_address = server_socket.accept()
+        client_socket.sendall(current_mode.encode())
+        with client_lock:
+            clients.append(client_socket)
+        bot_count += 1
+        if bot_count == EXP_CONNS:
+            threading.Thread(target=mode_switcher, daemon=True).start()
+
+def handle_data_connection(data_socket):
+    global current_mode
     while True:
         try:
-            data = client_socket.recv(4096).decode()
+            data = data_socket.recv(4096).decode()
             if data:
                 json_data = json.loads(data)
                 entry = {
@@ -60,40 +90,18 @@ def handle_client_connection(client_socket):
         except (json.JSONDecodeError, KeyError):
             continue
 
-def notify_clients(new_mode):
-    with client_lock:
-        for client in clients:
-            try:
-                client.sendall(new_mode.encode())
-            except BrokenPipeError:
-                clients.remove(client)
-
-def mode_switcher():
-    global current_mode
+def start_data_server():
+    data_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    data_server_socket.bind(("", PORT_DATA))
+    data_server_socket.listen(5)
     while True:
-        with mode_lock:
-            new_mode = random.choice(MODES)
-            current_mode = new_mode
-            notify_clients(new_mode)
-        time.sleep(random.randint(5, 15))
-
-def start_controller():
-    conn_count = 0
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(("", PORT))
-    server_socket.listen(5)
-
-    while True:
-        client_socket, client_address = server_socket.accept()
-        client_socket.sendall(current_mode.encode())
-        threading.Thread(target=handle_client_connection, args=(client_socket,), daemon=True).start()
-        conn_count += 1
-        if conn_count == EXP_CONNS:
-            threading.Thread(target=mode_switcher, daemon=True).start()
+        data_socket, data_address = data_server_socket.accept()
+        threading.Thread(target=handle_data_connection, args=(data_socket,), daemon=True).start()
 
 if __name__ == "__main__":
     with open(CSV_FILE, mode='w', newline='') as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=HEADERS)
         writer.writeheader()
 
-    start_controller()
+    threading.Thread(target=start_command_server, daemon=True).start()
+    start_data_server()
