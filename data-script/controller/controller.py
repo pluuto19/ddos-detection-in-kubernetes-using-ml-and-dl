@@ -12,8 +12,8 @@ MODES = ["normal_traffic", "high_traffic", "udp_flood", "tcp_flood", "http_flood
 CSV_FILE = "collected_data.csv"
 EXP_CONNS = 2
 
-HEADERS = [
-    "timestamp", "mode", "hostname", "output", "evt_time", "syscall_type", "priority", "rule", "source", "tags",
+# Fixed list of known resource metrics and syscalls
+RESOURCE_METRICS = [
     "node_cpu_seconds_total", "node_filesystem_avail_bytes", "node_filesystem_size_bytes", 
     "node_disk_read_bytes_total", "node_disk_written_bytes_total", "node_network_receive_bytes_total", 
     "node_network_receive_drop_total", "node_network_receive_errs_total", "node_network_transmit_packets_total",
@@ -23,6 +23,14 @@ HEADERS = [
     "node_sockstat_TCP_mem_bytes", "node_sockstat_UDP_inuse", "node_sockstat_UDP_mem", 
     "node_sockstat_sockets_used", "node_netstat_Tcp_CurrEstab", "node_filefd_allocated"
 ]
+
+SYSCALLS = [
+    "mmap", "munmap", "accept", "brk", "bind", "connect", "chdir", "clone", "close", "kill",
+    "listen", "mkdir", "open", "poll", "read", "rename", "recvfrom", "select", "socket",
+    "sendto", "write"
+]
+
+HEADERS = ["timestamp", "mode", "hostname", *RESOURCE_METRICS, *SYSCALLS]
 
 current_mode = MODES[0]
 clients = []
@@ -76,15 +84,16 @@ def handle_data_connection(data_socket):
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "mode": current_mode,
                     "hostname": json_data.get("Hostname"),
-                    "output": json_data.get("Output"),
-                    "evt_time": json_data["OutputFields"].get("evt.time"),
-                    "syscall_type": json_data["OutputFields"].get("syscall.type"),
-                    "priority": json_data.get("Priority"),
-                    "rule": json_data.get("Rule"),
-                    "source": json_data.get("Source"),
-                    "tags": ",".join(json_data.get("Tags", [])),
-                    **{metric: json_data.get(metric, None) for metric in HEADERS[10:]}
                 }
+
+                resource_metrics = json_data.get("ResourceMetrics", {})
+                for metric in RESOURCE_METRICS:
+                    entry[metric] = resource_metrics.get(metric, 0.0)
+
+                syscalls = json_data.get("Syscalls", {})
+                for syscall in SYSCALLS:
+                    entry[syscall] = syscalls.get(syscall, 0)
+
                 save_to_csv(entry)
         
         except (json.JSONDecodeError, KeyError):
