@@ -20,11 +20,12 @@ mode_binaries = {
 }
 
 def connect_to_controller():
+    global sock
     while True:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect(("", PORT_CMD))
-            print(f"Connected to controller at {"localhost"}:{PORT_CMD}")
+            sock.connect(("localhost", PORT_CMD))
+            print(f"Connected to controller at localhost:{PORT_CMD}")
             return
         except ConnectionRefusedError:
             print("Retrying in 5 seconds")
@@ -53,17 +54,18 @@ def launch_process(mode):
         return False
 
 def kill_current_process():
+    global current_process
     if current_process:
         try:
             os.kill(current_process.pid, signal.SIGKILL)
             current_process.wait(timeout=5)
         except ProcessLookupError:
             pass
-        
         print(f"Killed process with PID {current_process.pid}")
         current_process = None
 
 def handle_mode_change(new_mode):
+    global current_mode
     if new_mode != current_mode:
         print(f"Mode change detected: {new_mode}")
         kill_current_process()
@@ -71,12 +73,13 @@ def handle_mode_change(new_mode):
             current_mode = new_mode
 
 def run():
+    global sock
     while True:
         try:
             if not sock:
                 connect_to_controller()
 
-            mode = socket.recv(1024).decode().strip()
+            mode = sock.recv(1024).decode().strip()
             if not mode:
                 print("Lost connection to controller")
                 sock.close()
@@ -85,17 +88,17 @@ def run():
 
             handle_mode_change(mode)
 
-        except sock.error as e:
+        except socket.error as e:
             print(f"Socket error: {e}")
             if sock:
                 sock.close()
                 sock = None
-            time.sleep(5)  # Wait before reconnecting
+            time.sleep(5)
         except Exception as e:
             print(f"Unexpected error: {e}")
             time.sleep(5)
 
-def cleanup(self):
+def cleanup():
     kill_current_process()
     if sock:
         sock.close()
