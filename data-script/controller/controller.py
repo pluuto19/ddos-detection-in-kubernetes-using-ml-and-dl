@@ -7,12 +7,11 @@ import threading
 from datetime import datetime
 
 PORT_CMD = 7745
-PORT_DATA = 7746
+PORT_DATA = 7744
 MODES = ["normal_traffic", "high_traffic", "udp_flood", "tcp_flood", "http_flood", "icmp_flood"]
 CSV_FILE = "collected_data.csv"
-EXP_CONNS = 2
+EXP_CONNS = 3
 
-# Fixed list of known resource metrics and syscalls
 RESOURCE_METRICS = [
     "node_cpu_seconds_total", "node_filesystem_avail_bytes", "node_filesystem_size_bytes", 
     "node_disk_read_bytes_total", "node_disk_written_bytes_total", "node_network_receive_bytes_total", 
@@ -77,26 +76,49 @@ def handle_data_connection(data_socket):
     global current_mode
     while True:
         try:
-            data = data_socket.recv(4096).decode()
-            if data:
-                json_data = json.loads(data)
+            request = data_socket.recv(4096).decode()
+            if not request:
+                continue
+            
+            if "POST" in request:
+                content_length = 0
+                for line in request.split('\n'):
+                    if 'Content-Length:' in line:
+                        content_length = int(line.split(':')[1].strip())
+                        break
+                
+                body_start = request.find('\r\n\r\n') + 4
+                body = request[body_start:]
+                
+                print(f"Received data: {body}")
+                
+                json_data = json.loads(body)
+                
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "mode": current_mode,
-                    "hostname": json_data.get("Hostname"),
+                    "hostname": json_data.get("hostname", "unknown"),
                 }
 
-                resource_metrics = json_data.get("ResourceMetrics", {})
+                resource_metrics = json_data.get("resource_metrics", {})
                 for metric in RESOURCE_METRICS:
                     entry[metric] = resource_metrics.get(metric, 0.0)
 
-                syscalls = json_data.get("Syscalls", {})
+                syscalls_data = json_data.get("syscalls", {})
                 for syscall in SYSCALLS:
-                    entry[syscall] = syscalls.get(syscall, 0)
+                    print(f"Adding syscall {syscall}: {syscalls_data.get(syscall, 0)}")
+                    entry[syscall] = syscalls_data.get(syscall, 0)
 
+                print("Final entry:", entry)
+                
                 save_to_csv(entry)
-        
-        except (json.JSONDecodeError, KeyError):
+                
+                response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+                data_socket.sendall(response.encode())
+                
+        except (json.JSONDecodeError, KeyError) as e:
+            response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
+            data_socket.sendall(response.encode())
             continue
 
 def start_data_server():
