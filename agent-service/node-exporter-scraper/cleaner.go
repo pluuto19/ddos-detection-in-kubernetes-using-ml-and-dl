@@ -119,11 +119,6 @@ func GetResourceMetrics() *map[string]float64 {
 	return &result
 }
 
-func ResetResourceMetrics() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	resourceMetricsName = make(map[string]float64)
-}
 
 /*
 IMPROVEMENT

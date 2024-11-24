@@ -1,8 +1,21 @@
-- rule: Testing syscalls
+- rule: Scraping Syscalls
   desc: >
-    Checking HTTP connection and file output of syscalls.
+    Scraping relevant syscalls from all Kubernetes componenets and pods.
   condition: >
-    syscall.type in (mmap, munmap, accept, brk, bind, connect, chdir, clone, close, kill, listen, mkdir, open, poll, read, rename, recvfrom, select, socket, sendto, write)
+    (
+      (k8s.ns.name != '' and k8s.ns.name != null) or 
+      (k8s.pod.name != '' and k8s.pod.name != null) or 
+      (k8s.pod.id != '' and k8s.pod.id != null) or 
+      (k8s.pod.uid != '' and k8s.pod.uid != null) or 
+      (container.id != '' and container.id != null and container.id != 'host') or 
+      (k8s.pod.sandbox_id != '' and k8s.pod.sandbox_id != null) or
+      proc.name in ("kubelet", "kube-proxy", "kube-apiserver", 
+                   "kube-controller-manager", "kube-scheduler", 
+                   "etcd", "containerd", "containerd-shim")
+    ) and proc.name != "falco" and syscall.type in ("mmap", "munmap", "accept", "brk", "bind", "connect", "chdir", 
+                     "clone", "close", "kill", "listen", "mkdir", "open", "poll", 
+                     "rename", "recvfrom", "select", "socket", "sendto", "read", 
+                     "write", "clone3", "vfork", "execve", "execveat", "getsockopt")
   output: >
     event occ (event=%syscall.type)
   priority: CRITICAL

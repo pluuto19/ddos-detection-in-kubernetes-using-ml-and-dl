@@ -56,7 +56,7 @@ def mode_switcher():
             new_mode = random.choice(MODES)
             current_mode = new_mode
             notify_clients(new_mode)
-        time.sleep(random.randint(5, 15))
+        time.sleep(random.randint(180, 300))
 
 def start_command_server():
     bot_count = 0

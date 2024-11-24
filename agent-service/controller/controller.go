@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	TIME_INTERVAL       = int64(4)
+	TIME_INTERVAL       = int64(1)
 	CENTRAL_SERVER_ADDR = "http://localhost:7744/monitor/agent-service"
 )
 
@@ -62,7 +62,7 @@ func FetchAndCombine() {
 		if now.Second()%int(TIME_INTERVAL) == 0 {
 			for {
 				<-ticker.C
-				
+
 				syscalls := falcoscraper.GetSyscalls()
 				nodeexporterscraper.GetMetrics()
 				resourceMetrics := nodeexporterscraper.GetResourceMetrics()
@@ -79,7 +79,7 @@ func FetchAndCombine() {
 				}
 
 				sendToCentralServer(combinedData)
-
+				falcoscraper.ResetSyscalls()
 				fmt.Println(combinedData)
 			}
 		}
