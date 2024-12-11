@@ -444,5 +444,4 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/go,python,visualstudiocode,goland,goland+all,goland+iml
 
-collected_data.csv
 .idea
