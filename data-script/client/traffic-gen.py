@@ -37,7 +37,7 @@ class TrafficGenerator:
             self.cooldown_time = 45
             self.max_total_connections = 5000
         
-        self.target_ports = [80, 443, 8080, 8443, 3000, 3001, 5000, 5001, 8000, 8001]
+        self.target_ports = [80]
         
         for sig in [signal.SIGINT, signal.SIGTERM]:
             signal.signal(sig, self.handle_shutdown)
