@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func GetMetrics() {
+func FetchMetricsFromServer() {
 	resp, err := http.Get("http://localhost:9100/metrics")
 	if err != nil {
 		return

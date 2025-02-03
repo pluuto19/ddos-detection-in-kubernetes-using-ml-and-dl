@@ -16,8 +16,8 @@ var (
 )
 
 func cleanResponseBody(metricsStr string) {
-	deviceBasedResourceMetrics = []string{"node_cpu_seconds_total", "node_filesystem_avail_bytes", "node_filesystem_size_bytes", "node_disk_read_bytes_total", "node_disk_written_bytes_total", "node_network_receive_bytes_total", "node_network_receive_drop_total", "node_network_receive_errs_total", "node_network_transmit_packets_total"}
-	noDeviceBasedResourceMetrics = []string{"node_vmstat_pgmajfault", "node_memory_MemAvailable_bytes", "node_memory_MemTotal_bytes", "node_forks_total", "node_intr_total", "node_load1", "node_load5", "node_load15", "node_sockstat_TCP_alloc", "node_sockstat_TCP_inuse", "node_sockstat_TCP_mem", "node_sockstat_TCP_mem_bytes", "node_sockstat_UDP_inuse", "node_sockstat_UDP_mem", "node_sockstat_sockets_used", "node_netstat_Tcp_CurrEstab", "node_filefd_allocated"}
+	deviceBasedResourceMetrics = []string{"node_cpu_seconds_total", "node_filesystem_avail_bytes", "node_filesystem_size_bytes", "node_disk_read_bytes_total", "node_disk_written_bytes_total", "node_network_receive_bytes_total", "node_network_receive_drop_total", "node_network_transmit_packets_total"}
+	noDeviceBasedResourceMetrics = []string{"node_vmstat_pgmajfault", "node_memory_MemAvailable_bytes", "node_memory_MemTotal_bytes", "node_forks_total", "node_intr_total", "node_load1", "node_load5", "node_load15", "node_sockstat_TCP_alloc", "node_sockstat_TCP_mem", "node_sockstat_TCP_mem_bytes", "node_sockstat_UDP_mem", "node_sockstat_sockets_used", "node_filefd_allocated"}
 
 	mutex.Lock()
 	defer mutex.Unlock()

@@ -64,7 +64,7 @@ func FetchAndCombine() {
 				<-ticker.C
 
 				syscalls := falcoscraper.GetSyscalls()
-				nodeexporterscraper.GetMetrics()
+				nodeexporterscraper.FetchMetricsFromServer()
 				resourceMetrics := nodeexporterscraper.GetResourceMetrics()
 
 				if syscalls == nil || resourceMetrics == nil {
