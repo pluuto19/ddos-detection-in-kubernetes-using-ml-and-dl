@@ -12,8 +12,8 @@ CONTROLLER_PORT = 8545
 RECONNECT_DELAY = 5
 
 ATTACK_CONTAINERS = {
-    "http": "attack-system/http-attacker",
-    "tcp": "attack-system/tcp-attacker"
+    "http": "fyp/http-attacker",
+    "tcp": "fyp/tcp-attacker"
 }
 
 def find_docker():
