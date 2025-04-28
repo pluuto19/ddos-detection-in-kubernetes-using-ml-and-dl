@@ -1,13 +1,9 @@
-FROM alpine:3.16
+FROM debian:bullseye-slim
 
-RUN apk add --no-cache build-base openssl-dev git zlib-dev \
-    && git clone https://github.com/wg/wrk.git \
-    && cd wrk \
-    && make \
-    && cp wrk /usr/local/bin \
-    && cd .. \
-    && rm -rf wrk \
-    && apk del git build-base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wrk ca-certificates curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY attack.sh /attack.sh
 RUN chmod +x /attack.sh

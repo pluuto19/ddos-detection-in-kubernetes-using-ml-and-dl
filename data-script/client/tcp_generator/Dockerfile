@@ -1,6 +1,9 @@
-FROM alpine:3.16
+FROM debian:bullseye-slim
 
-RUN apk add --no-cache iperf3
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iperf3 ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY attack.sh /attack.sh
 RUN chmod +x /attack.sh
