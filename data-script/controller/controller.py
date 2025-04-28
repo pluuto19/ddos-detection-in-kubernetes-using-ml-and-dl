@@ -1,138 +1,239 @@
 import socket
 import json
-import csv
-import random
-import time
 import threading
-from datetime import datetime
+import time
+import random
+import sys
+import signal
 
-PORT_CMD = 7745
-PORT_DATA = 7744
-MODES = ["normal_traffic", "high_traffic", "udp_flood", "tcp_flood", "http_flood", "icmp_flood"]
-CSV_FILE = "collected_data.csv"
-EXP_CONNS = 3
+PORT = 8545
+ATTACK_TYPES = ["http", "tcp"]
+DEFAULT_TARGETS = {
+    "http": "http://service.default:8080",
+    "tcp": "service.default:5001"
+}
+MIN_ATTACK_DURATION = 240
+MAX_ATTACK_DURATION = 480
+ATTACK_INTERVAL = 5
 
-RESOURCE_METRICS = [
-    "node_cpu_seconds_total", "node_filesystem_avail_bytes", "node_filesystem_size_bytes", 
-    "node_disk_read_bytes_total", "node_disk_written_bytes_total", "node_network_receive_bytes_total", 
-    "node_network_receive_drop_total", "node_network_receive_errs_total", "node_network_transmit_packets_total",
-    "node_vmstat_pgmajfault", "node_memory_MemAvailable_bytes", "node_memory_MemTotal_bytes", 
-    "node_forks_total", "node_intr_total", "node_load1", "node_load5", "node_load15", 
-    "node_sockstat_TCP_alloc", "node_sockstat_TCP_inuse", "node_sockstat_TCP_mem", 
-    "node_sockstat_TCP_mem_bytes", "node_sockstat_UDP_inuse", "node_sockstat_UDP_mem", 
-    "node_sockstat_sockets_used", "node_netstat_Tcp_CurrEstab", "node_filefd_allocated"
-]
-
-SYSCALLS = [
-    "mmap", "munmap", "accept", "brk", "bind", "connect", "chdir", "clone", "close", "kill",
-    "listen", "mkdir", "open", "poll", "read", "rename", "recvfrom", "select", "socket",
-    "sendto", "write"
-]
-
-HEADERS = ["timestamp", "mode", "hostname", *RESOURCE_METRICS, *SYSCALLS]
-
-current_mode = MODES[0]
 clients = []
-mode_lock = threading.Lock()
-client_lock = threading.Lock()
+clients_lock = threading.Lock()
+current_attack = None
+attack_end_time = 0
 
-def save_to_csv(data):
-    with open(CSV_FILE, mode='a', newline='') as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=HEADERS)
-        writer.writerow(data)
+def send_command(client_socket, command):
+    try:
+        client_socket.sendall(json.dumps(command).encode('utf-8'))
+        return True
+    except Exception as e:
+        print(f"Error sending command: {e}")
+        return False
 
-def notify_clients(new_mode):
-    with client_lock:
-        for client in clients:
-            try:
-                client.sendall(new_mode.encode())
-            except BrokenPipeError:
-                clients.remove(client)
-
-def mode_switcher():
-    global current_mode
-    while True:
-        with mode_lock:
-            new_mode = random.choice(MODES)
-            current_mode = new_mode
-            notify_clients(new_mode)
-        time.sleep(random.randint(180, 300))
-
-def start_command_server():
-    bot_count = 0
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(("", PORT_CMD))
-    server_socket.listen(5)
-    while True:
-        client_socket, client_address = server_socket.accept()
-        client_socket.sendall(current_mode.encode())
-        with client_lock:
-            clients.append(client_socket)
-        bot_count += 1
-        if bot_count == EXP_CONNS:
-            threading.Thread(target=mode_switcher, daemon=True).start()
-
-def handle_data_connection(data_socket):
-    global current_mode
+def handle_client(client_socket, client_address):
+    client_id = f"{client_address[0]}:{client_address[1]}"
+    print(f"New client connected: {client_id}")
+    
+    if not send_command(client_socket, {"type": "ping"}):
+        print(f"Failed to send initial ping to {client_id}, disconnecting")
+        remove_client(client_socket)
+        return
+    
     while True:
         try:
-            request = data_socket.recv(4096).decode()
-            if not request:
-                continue
+            data = client_socket.recv(4096)
+            if not data:
+                print(f"Client disconnected: {client_id}")
+                break
             
-            if "POST" in request:
-                content_length = 0
-                for line in request.split('\n'):
-                    if 'Content-Length:' in line:
-                        content_length = int(line.split(':')[1].strip())
-                        break
+            try:
+                message = json.loads(data.decode('utf-8'))
+                message_type = message.get("type")
                 
-                body_start = request.find('\r\n\r\n') + 4
-                body = request[body_start:]
+                if message_type == "status":
+                    status = message.get("status")
+                    attack_type = message.get("attack_type", "unknown")
+                    container_id = message.get("container_id", "unknown")
+                    
+                    if status == "attack_started":
+                        print(f"Client {client_id} started {attack_type} attack with container {container_id[:12]}")
+                    elif status == "stopped":
+                        print(f"Client {client_id} stopped attack")
                 
-                print(f"Received data: {body}")
+                elif message_type == "error":
+                    print(f"Error from client {client_id}: {message.get('message', 'Unknown error')}")
                 
-                json_data = json.loads(body)
-                
-                entry = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "mode": current_mode,
-                    "hostname": json_data.get("hostname", "unknown"),
-                }
+            except json.JSONDecodeError:
+                print(f"Invalid JSON from client {client_id}: {data.decode('utf-8')}")
+        
+        except Exception as e:
+            print(f"Error handling client {client_id}: {e}")
+            break
+    
+    remove_client(client_socket)
 
-                resource_metrics = json_data.get("resource_metrics", {})
-                for metric in RESOURCE_METRICS:
-                    entry[metric] = resource_metrics.get(metric, 0.0)
+def remove_client(client_socket):
+    with clients_lock:
+        if client_socket in clients:
+            clients.remove(client_socket)
+    
+    try:
+        client_socket.close()
+    except:
+        pass
 
-                syscalls_data = json_data.get("syscalls", {})
-                for syscall in SYSCALLS:
-                    print(f"Adding syscall {syscall}: {syscalls_data.get(syscall, 0)}")
-                    entry[syscall] = syscalls_data.get(syscall, 0)
-
-                print("Final entry:", entry)
-                
-                save_to_csv(entry)
-                
-                response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
-                data_socket.sendall(response.encode())
-                
-        except (json.JSONDecodeError, KeyError) as e:
-            response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
-            data_socket.sendall(response.encode())
-            continue
-
-def start_data_server():
-    data_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    data_server_socket.bind(("", PORT_DATA))
-    data_server_socket.listen(5)
+def accept_clients(server_socket):
     while True:
-        data_socket, data_address = data_server_socket.accept()
-        threading.Thread(target=handle_data_connection, args=(data_socket,), daemon=True).start()
+        try:
+            client_socket, client_address = server_socket.accept()
+            
+            with clients_lock:
+                clients.append(client_socket)
+            
+            client_thread = threading.Thread(
+                target=handle_client,
+                args=(client_socket, client_address)
+            )
+            client_thread.daemon = True
+            client_thread.start()
+            
+        except Exception as e:
+            print(f"Error accepting client: {e}")
+            time.sleep(1)
+
+def send_to_all_clients(command):
+    with clients_lock:
+        if not clients:
+            print("No clients connected")
+            return False
+        
+        client_count = len(clients)
+        print(f"Sending command to {client_count} clients")
+        
+        clients_copy = clients.copy()
+    
+    success_count = 0
+    for client_socket in clients_copy:
+        try:
+            if send_command(client_socket, command):
+                success_count += 1
+        except:
+            pass
+    
+    print(f"Command sent to {success_count}/{client_count} clients")
+    return success_count > 0
+
+def start_attack(attack_type, target, duration, additional_params=None):
+    global current_attack, attack_end_time
+    
+    command = {
+        "type": "attack",
+        "attack_type": attack_type,
+        "target": target,
+        "duration": duration
+    }
+    
+    if additional_params:
+        command.update(additional_params)
+    
+    success = send_to_all_clients(command)
+    
+    if success:
+        current_attack = attack_type
+        attack_end_time = time.time() + duration
+        print(f"[{time.strftime('%H:%M:%S')}] Started {attack_type} attack for {duration} seconds")
+    
+    return success
+
+def stop_attack():
+    global current_attack, attack_end_time
+    
+    command = {"type": "stop"}
+    success = send_to_all_clients(command)
+    
+    if success:
+        current_attack = None
+        attack_end_time = 0
+        print(f"[{time.strftime('%H:%M:%S')}] Stopped all attacks")
+    
+    return success
+
+def attack_manager():
+    global current_attack, attack_end_time
+    
+    while True:
+        with clients_lock:
+            if not clients:
+                print("Waiting for clients to connect...")
+                time.sleep(5)
+                continue
+        
+        current_time = time.time()
+        
+        if current_attack is None or current_time > attack_end_time:
+            if current_attack is not None:
+                print(f"[{time.strftime('%H:%M:%S')}] Previous attack completed")
+                stop_attack()
+                time.sleep(ATTACK_INTERVAL)
+            
+            attack_type = random.choice(ATTACK_TYPES)
+            
+            duration = random.randint(MIN_ATTACK_DURATION, MAX_ATTACK_DURATION)
+            
+            target = DEFAULT_TARGETS[attack_type]
+            
+            additional_params = None
+            if attack_type == "http":
+                additional_params = {
+                    "threads": random.randint(2, 8),
+                    "connections": random.randint(50, 200)
+                }
+            
+            start_attack(attack_type, target, duration, additional_params)
+        
+        time.sleep(5)
+
+def main():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
+    try:
+        server_socket.bind(('0.0.0.0', PORT))
+        server_socket.listen(10)
+        print(f"Attack controller started on port {PORT}")
+        print(f"HTTP target: {DEFAULT_TARGETS['http']}")
+        print(f"TCP target: {DEFAULT_TARGETS['tcp']}")
+        
+        accept_thread = threading.Thread(target=accept_clients, args=(server_socket,))
+        accept_thread.daemon = True
+        accept_thread.start()
+        
+        def signal_handler(sig, frame):
+            print("\nShutting down controller...")
+            try:
+                stop_attack()
+                server_socket.close()
+            except:
+                pass
+            sys.exit(0)
+            
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        print("Auto-attack mode enabled. Press Ctrl+C to exit.")
+        
+        attack_manager()
+        
+    except KeyboardInterrupt:
+        print("\nShutting down controller...")
+    except Exception as e:
+        print(f"Server error: {e}")
+    
+    finally:
+        try:
+            stop_attack()
+            server_socket.close()
+        except:
+            pass
 
 if __name__ == "__main__":
-    with open(CSV_FILE, mode='w', newline='') as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=HEADERS)
-        writer.writeheader()
-
-    threading.Thread(target=start_command_server, daemon=True).start()
-    start_data_server()
+    main()
