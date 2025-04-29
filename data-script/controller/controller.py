@@ -9,8 +9,8 @@ import signal
 PORT = 8545
 ATTACK_TYPES = ["http", "tcp"]
 DEFAULT_TARGETS = {
-    "http": "http://service.default:8080",
-    "tcp": "service.default:5001"
+    "http": "http://load-test-server.default.svc.cluster.local",
+    "tcp": "load-test-server.default.svc.cluster.local:5201"
 }
 MIN_ATTACK_DURATION = 240
 MAX_ATTACK_DURATION = 480
@@ -122,7 +122,7 @@ def send_to_all_clients(command):
     print(f"Command sent to {success_count}/{client_count} clients")
     return success_count > 0
 
-def start_attack(attack_type, target, duration, additional_params=None):
+def start_attack(attack_type, target, duration):
     global current_attack, attack_end_time
     
     command = {
@@ -131,9 +131,6 @@ def start_attack(attack_type, target, duration, additional_params=None):
         "target": target,
         "duration": duration
     }
-    
-    if additional_params:
-        command.update(additional_params)
     
     success = send_to_all_clients(command)
     
@@ -176,19 +173,10 @@ def attack_manager():
                 time.sleep(ATTACK_INTERVAL)
             
             attack_type = random.choice(ATTACK_TYPES)
-            
             duration = random.randint(MIN_ATTACK_DURATION, MAX_ATTACK_DURATION)
-            
             target = DEFAULT_TARGETS[attack_type]
             
-            additional_params = None
-            if attack_type == "http":
-                additional_params = {
-                    "threads": random.randint(2, 8),
-                    "connections": random.randint(50, 200)
-                }
-            
-            start_attack(attack_type, target, duration, additional_params)
+            start_attack(attack_type, target, duration)
         
         time.sleep(5)
 

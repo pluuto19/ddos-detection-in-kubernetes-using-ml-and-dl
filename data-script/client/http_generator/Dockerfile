@@ -1,7 +1,7 @@
 FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wrk ca-certificates curl && \
+    wrk ca-certificates curl iputils-ping dnsutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
