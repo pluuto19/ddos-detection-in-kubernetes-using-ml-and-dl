@@ -1,8 +1,10 @@
 #!/bin/sh
 
 DURATION=60
-PORT=5001
+PORT=5201
 HOST="localhost"
+PARALLEL=10
+BANDWIDTH="1G"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -14,6 +16,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 echo "Starting TCP attack against $HOST:$PORT"
-echo "Duration: $DURATION seconds"
+echo "Duration: $DURATION seconds, Parallel connections: $PARALLEL, Bandwidth: $BANDWIDTH"
 
-exec iperf3 -c "$HOST" -p "$PORT" -t "$DURATION" -P 10 -b 0
+exec iperf3 -c "$HOST" -p "$PORT" -t "$DURATION" -P "$PARALLEL" -b "$BANDWIDTH"

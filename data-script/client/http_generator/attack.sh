@@ -1,9 +1,9 @@
 #!/bin/sh
 
-THREADS=2
-CONNECTIONS=10
+THREADS=6
+CONNECTIONS=150 
 DURATION=60
-TARGET="http://localhost:80"
+TARGET="http://localhost:8000"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -18,4 +18,4 @@ done
 echo "Starting HTTP attack against $TARGET"
 echo "Threads: $THREADS, Connections: $CONNECTIONS, Duration: $DURATION seconds"
 
-exec wrk -t"$THREADS" -c"$CONNECTIONS" -d"${DURATION}s" --latency "$TARGET"
+exec wrk -t"$THREADS" -c"$CONNECTIONS" -d"${DURATION}s" --latency "$TARGET/process"

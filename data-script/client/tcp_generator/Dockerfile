@@ -1,7 +1,7 @@
 FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    iperf3 ca-certificates && \
+    iperf3 ca-certificates iputils-ping dnsutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
