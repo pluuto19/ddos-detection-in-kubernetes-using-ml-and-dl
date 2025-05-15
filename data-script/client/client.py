@@ -1,4 +1,3 @@
-# client.py
 import socket
 import subprocess
 import signal
