@@ -1,110 +1,72 @@
-i# Kubernetes DoS Detection System Demo Simulator
+# DDoS Detection in Kubernetes Simulation
 
-This directory contains scripts to simulate a Kubernetes DoS detection system for demonstration purposes. The simulation creates multiple terminal windows representing different components of the system and orchestrates a simulated attack scenario.
+This directory contains simple scripts for simulating a DDoS attack detection system in a Kubernetes environment.
 
-## Components Simulated
+## Components
 
-1. **Kubernetes Master Node** - Shows cluster status, pods, and services
-2. **Kubernetes Worker Nodes** (3) - Shows system metrics and agent status
-3. **Attacker Nodes** (3) - Simulates attack execution
-4. **Command and Control Server** - Controls the attacker nodes
-5. **Data Aggregator** - Collects metrics and runs inference
-6. **Dashboard** - Visualizes system status and attack detection
+- **K8s Master**: Simulates a Kubernetes master node
+- **K8s Workers**: Simulates Kubernetes worker nodes (3 nodes)
+- **CnC Server**: Simulates a Command and Control server that orchestrates attacks
+- **Botnet**: Simulates botnet nodes (3 bots) that execute attacks
+- **Data Aggregator**: Simulates the data collection and analysis system
+- **Dashboard**: Displays the attack detection results
 
-## Requirements
+## Scripts
 
-- Python 3.6+
-- Terminal emulator (gnome-terminal, xterm, or Terminal.app on macOS)
-- curses library (usually included with Python)
+- `k8s_master.py`: Simulates a Kubernetes master node
+- `k8s_worker.py`: Simulates a Kubernetes worker node
+- `cnc_server.py`: Simulates a Command and Control server
+- `botnet.py`: Simulates a botnet node
+- `data_aggregator.py`: Simulates the data aggregator server
+- `run_dashboard.py`: Runs the dashboard data generator
 
-## Setup
+## Usage
 
-1. Make sure all scripts are executable:
+### Running Individual Components
 
-```bash
-chmod +x *.py
-```
+1. **K8s Master**:
+   ```bash
+   python k8s_master.py
+   ```
 
-2. Install required Python packages:
+2. **K8s Worker** (specify worker ID 1-3):
+   ```bash
+   python k8s_worker.py 1
+   ```
 
-```bash
-pip install argparse
-```
+3. **CnC Server**:
+   ```bash
+   python cnc_server.py
+   ```
 
-## Running the Demo
+4. **Botnet Node** (specify bot ID 1-3):
+   ```bash
+   python botnet.py 1
+   ```
 
-### Option 1: Full Demo
+5. **Data Aggregator**:
+   ```bash
+   python data_aggregator.py
+   ```
 
-To run the complete demo with all components and the attack scenario:
-
-```bash
-./demo_orchestrator.py
-```
-
-This will:
-1. Launch all terminal windows
-2. Wait for them to initialize
-3. Start the attack scenario
-4. Show the attack detection in the dashboard
-
-### Option 2: Just Launch Terminals
-
-To only launch the terminal windows without running the attack scenario:
-
-```bash
-./demo_orchestrator.py --launch
-```
-
-### Option 3: Run Attack Scenario
-
-If you've already launched the terminals and want to run the attack scenario:
-
-```bash
-./demo_orchestrator.py --attack
-```
-
-## Dashboard Controls
-
-The dashboard UI has the following keyboard controls:
-
-- `a` - Simulate an attack
-- `s` - Stop the simulated attack
-- `q` - Quit the dashboard
-
-## Individual Components
-
-You can also run each component individually:
-
-- **Terminal Simulator**: `./terminal_simulator.py`
-- **Dashboard UI**: `./dashboard_ui.py`
-- **Attack Script**: `./attack.py --type syn_flood --target 192.168.1.100 --duration 30`
-- **Botnet Control**: `./botnet.py list`
-- **Data Aggregator**: `./data_aggregator_sim.py --status`
+6. **Dashboard**:
+   ```bash
+   python run_dashboard.py
+   ```
 
 ## Recording with OBS
 
-To record the demo with OBS:
+To record the simulation for demonstration:
 
-1. Set up OBS to capture specific windows or regions of your screen
-2. Arrange the terminal windows in a logical layout
-3. Consider using different backgrounds or terminal colors to visually differentiate the components
-4. Start recording in OBS and then run the demo
+1. Start OBS Studio
+2. Add the terminal windows as sources
+3. Run the simulation scripts in separate terminals
+4. Record or stream as needed
 
-## Customization
+## Notes
 
-You can customize the demo by:
-
-- Modifying the terminal positions in `demo_orchestrator.py`
-- Changing the attack types in `attack.py`
-- Adjusting the dashboard visualization in `dashboard_ui.py`
-- Adding more commands to the terminal simulators
-
-## Troubleshooting
-
-- If terminals don't open, check if you have gnome-terminal or xterm installed
-- If the dashboard doesn't display correctly, try resizing the terminal window
-- If scripts fail to run, ensure they have executable permissions
-
-## License
-
-This simulation is provided for educational purposes only. 
+- The simulations are designed to be visually interesting for recording purposes
+- CnC server accepts commands: help, list, attack, stop, status
+- K8s worker and data aggregator will randomly simulate attacks
+- Botnet nodes will randomly receive commands from CnC
+- Dashboard data generator will store data in InfluxDB for visualization in Grafana 
